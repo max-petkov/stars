@@ -1,15 +1,19 @@
 import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.121.1/build/three.module.js";
 import { OrbitControls } from "https://cdn.jsdelivr.net/npm/three@0.121.1/examples/jsm/controls/OrbitControls.js";
+import { RenderPass } from "https://cdn.jsdelivr.net/npm/three@0.121.1/examples/jsm/postprocessing/RenderPass.js";
+import { EffectComposer } from "https://cdn.jsdelivr.net/npm/three@0.121.1/examples/jsm/postprocessing/EffectComposer.js";
+import { UnrealBloomPass } from "https://cdn.jsdelivr.net/npm/three@0.121.1/examples/jsm/postprocessing/UnrealBloomPass.js";
+import GUI from 'https://cdn.jsdelivr.net/npm/lil-gui@0.19/+esm';
 
 function Curves() {
   this.canvas = document.querySelector("canvas");
   this.scene = null;
   this.camera = null;
-  this.geometry = null;
-  this.material = null;
   this.renderer = null;
-  this.mesh = null;
-  this.light = null;
+  this.renderPass = null;
+  this.effectComposer = null;
+  this.unrealBloomPass = null
+  this.meshes = [];
   this.controls = null;
   this.size = {
     width: window.innerWidth,
@@ -17,11 +21,73 @@ function Curves() {
   };
   this.curve = null;
   this.fov = 75;
+  
+  this.variants = [
+    {
+      texture: "./img/grad-green.jpg",
+      speed: 1.1,
+      amplitude: 0.2,
+      frequency: 3.,
+      points: [
+        new THREE.Vector3(-10.689140896731658, 2.041518463927172, 12.38487444491875),
+        new THREE.Vector3(-8.204101587228354, 2.0511835509003893, 12.38487444491875),
+        new THREE.Vector3(-2.164652739907572, 2.372272723877032, 12.3004846232816),
+        new THREE.Vector3(0.5651971218071963, 1.0429235386994042, 12.3004846232816),
+        new THREE.Vector3(3.9282468049758754, 1.6866171202378193, 12.3004846232816),
+        new THREE.Vector3(6.847043476617296, 1.5456594607522591, 11.668719552457011),
+        new THREE.Vector3(7.9560219300636135, 1.7180363931560647, 11.380237294320157)
+      ],
+    },
+    {
+      texture: "./img/grad-yellow.jpg",
+      speed: 1.1,
+      amplitude: 0.1,
+      frequency: 2.,
+      points: [
+        new THREE.Vector3(-10.689140896731658, 2.041518463927172, 12.38487444491875),
+        new THREE.Vector3(-8.204101587228354, 2.0511835509003893, 12.38487444491875),
+        new THREE.Vector3(-2.164652739907572, 2.372272723877032, 12.3004846232816),
+        new THREE.Vector3(0.5651971218071963, 1.0429235386994042, 12.3004846232816),
+        new THREE.Vector3(3.9282468049758754, 1.6866171202378193, 12.3004846232816),
+        new THREE.Vector3(6.847043476617296, 1.5456594607522591, 11.668719552457011),
+        new THREE.Vector3(7.9560219300636135, 1.7180363931560647, 11.380237294320157)
+      ],
+    },
+    {
+      texture: "./img/grad-blue.jpg",
+      speed: 1.2,
+      amplitude: 0.2,
+      frequency: 3.,
+      points: [
+        new THREE.Vector3(-9.255569666329968, 3.00854450183378, 12.38487444491875),
+        new THREE.Vector3(-4.795719544597945, -0.44112693645510337, 12.38487444491875),
+        new THREE.Vector3(-2.045779782586448, 0.4727472514642228, 12.3004846232816),
+        new THREE.Vector3(2.175621353994407, 0.18972439065774882, 12.3004846232816),
+        new THREE.Vector3(4.598866185991017, -0.758162041129951, 12.178475668688959)
+      ],
+    },
+  ];
+}
+
+Curves.prototype.createFilter = function() {
+  this.renderPass = new RenderPass(this.scene, this.camera);
+  this.effectComposer = new EffectComposer(this.renderer);
+  this.unrealBloomPass = new UnrealBloomPass();
+  this.unrealBloomPass.resolution = new THREE.Vector2(this.size.width, this.size.height);
+  this.unrealBloomPass.strength = 1.8;
+  this.unrealBloomPass.radius = 1.2;
+  this.unrealBloomPass.threshold = 0.3;
+
+  this.effectComposer.addPass(this.renderPass);
+  this.effectComposer.addPass(this.unrealBloomPass);
+
+  this.renderer.toneMapping = THREE.CineonToneMapping;
+  this.renderer.toneMappingExposure = 1;
 }
 
 Curves.prototype.createScene = function () {
   this.scene = new THREE.Scene();
-  this.scene.add(new THREE.GridHelper(20, 20));
+  // this.scene.add(new THREE.GridHelper(20, 20));
 };
 
 Curves.prototype.createCamera = function () {
@@ -32,43 +98,56 @@ Curves.prototype.createCamera = function () {
   this.camera.position.z = 17;
 };
 
-Curves.prototype.createModel = function () {
-  const curve = new THREE.CatmullRomCurve3( [
-	new THREE.Vector3( -10, 0, 10 ),
-	new THREE.Vector3( -5, 5, 5 ),
-	new THREE.Vector3( 0, 0, 0 ),
-	new THREE.Vector3( 5, -5, 5 ),
-	new THREE.Vector3( 10, 0, 10 )
-] );
-  this.geometry = new THREE.TubeGeometry(curve, 100, 0.02, 2, false);
-  this.material = new THREE.ShaderMaterial({ 
-    uniforms:{
-      uTime: {value: 0},
-      uTexture: {value: new THREE.TextureLoader().load("./img/grad-2.jpg")}
-    },
-    vertexShader: this.vertex(),
-    fragmentShader: this.fragment(),
-   });
-  this.mesh = new THREE.Mesh(this.geometry, this.material);
-  this.scene.add(this.mesh);
+Curves.prototype.createLines = function () {
+  for (let i = 0; i < this.variants.length; i++) {
+    const curve = new THREE.CatmullRomCurve3( this.variants[i].points);
+    const geometry = new THREE.TubeGeometry(curve, 100, 0.05, 2, false);
+    const material = new THREE.ShaderMaterial({ 
+      uniforms:{
+        uTime: {value: 0},
+        uTexture: {value: new THREE.TextureLoader().load(this.variants[i].texture)},
+        uSpeed: {value: this.variants[i].speed},
+        uAmplitude: {value: this.variants[i].amplitude},
+        uFrequency: {value: this.variants[i].frequency},
+      },
+      // blending: THREE.AdditiveBlending,
+      vertexShader: this.vertex(),
+      fragmentShader: this.fragment(),
+      // wireframe: true,
+     });
+    const mesh = new THREE.Mesh(geometry, material);
+     if(!i) {
+      mesh.position.y = -1.5;
+      mesh.position.x = -0.5;
+    } else if(i === 1) {
+      mesh.position.y = -1.7;
+    } else {
+       mesh.position.y = 0.5;
+       mesh.position.x = -2.5;
+     }
+
+    this.meshes.push(mesh);
+    this.scene.add(mesh);
+  }
 };
 
 Curves.prototype.vertex = function() {
   return `
   uniform float uTime;
+  uniform float uSpeed;
+  uniform float uAmplitude;
+  uniform float uFrequency;
 
-  varying float vMovementY;
+  varying float vY;
   varying vec2 vUv;
   
   void main() {
     vec3 newPosition = position;
     float PI = 3.141592653589793238462643383279502884197;
-    float movementY = cos((newPosition.y + uTime/1.) * 0.3 * PI);
-    newPosition.z += sin((newPosition.x + uTime/1.) * 0.1 * PI);
-    newPosition.x += sin((newPosition.x + uTime/1.) * 0.1 * PI);
-    newPosition.y += movementY;
+    float y = uAmplitude * sin((newPosition.x - uTime/uSpeed) * PI / uFrequency);
 
-    vMovementY = movementY;
+    newPosition.yxz += y;
+    vY = y;
     vUv = uv;
 
     gl_Position = projectionMatrix * modelViewMatrix * vec4(newPosition, 1.); 
@@ -80,95 +159,13 @@ Curves.prototype.fragment = function() {
   return `
   uniform sampler2D uTexture;
 
-  varying float vMovementY;
+  varying float vY;
   varying vec2 vUv;
   
   void main() {
-    // Variant 1
-    // vec3 color1 = vec3(0.165,1.,0.471);
-    // vec3 color2 = vec3(0.145,0.541,0.906);
-    // vec3 finalColor = mix(color1, color2, 0.5 * (vMovementY + 1.));
-
-    // Variant2 - Working one with small dots
-    vec4 texture = texture2D(uTexture, vUv);
-    texture.b *= 0.05 / (1. * vMovementY * 1. + 1.);
-    // texture.rgb *= 0.05 / (1. * vMovementY * 1. + 1.);
-
-    // Variant3 - (Only Picture)
-    // vec4 texture = texture2D(uTexture, vUv);
-    
-    gl_FragColor = texture;
-
-  }
-  `;
-}
-
-Curves.prototype.createModel2 = function () {
-  const curve = new THREE.CatmullRomCurve3( [
-	new THREE.Vector3( -10, 0, 10 ),
-	new THREE.Vector3( -5, 5, 5 ),
-	new THREE.Vector3( 0, 0, 0 ),
-	new THREE.Vector3( 5, -5, 5 ),
-	new THREE.Vector3( 10, 0, 10 )
-] );
-  this.geometry2 = new THREE.TubeGeometry(curve, 100, 0.02, 2, false);
-  this.material2 = new THREE.ShaderMaterial({ 
-    uniforms:{
-      uTime: {value: 0},
-      uTexture: {value: new THREE.TextureLoader().load("./img/grad-2.jpg")}
-    },
-    vertexShader: this.vertex2(),
-    fragmentShader: this.fragment2(),
-    blending: THREE.AdditiveBlending,
-   });
-  this.mesh2 = new THREE.Mesh(this.geometry2, this.material2);
-  this.scene.add(this.mesh2);
-};
-
-Curves.prototype.vertex2 = function() {
-  return `
-  uniform float uTime;
-
-  varying float vMovementY;
-  varying vec2 vUv;
-  
-  void main() {
-    vec3 newPosition = position;
-    float PI = 3.141592653589793238462643383279502884197;
-    float movementY = cos((newPosition.y + uTime/1.) * 0.3 * PI);
-    newPosition.z += sin((newPosition.x + uTime/1.) * 0.1 * PI);
-    newPosition.x += sin((newPosition.x + uTime/1.) * 0.1 * PI);
-    newPosition.y += movementY;
-
-    vMovementY = movementY;
-    vUv = uv;
-
-    gl_Position = projectionMatrix * modelViewMatrix * vec4(newPosition, 1.); 
-  }
-  `;
-}
-
-Curves.prototype.fragment2 = function() {
-  return `
-  uniform sampler2D uTexture;
-
-  varying float vMovementY;
-  varying vec2 vUv;
-  
-  void main() {
-    // Variant 1
-    // vec3 color1 = vec3(0.165,1.,0.471);
-    // vec3 color2 = vec3(0.145,0.541,0.906);
-    // vec3 finalColor = mix(color1, color2, 0.5 * (vMovementY + 1.));
-
-    // Variant2 - Working one with small dots
-    // texture.rgb *= 0.05 / (1. * vMovementY * 1. + 1.);
-
-    // Variant3 (Only Picture) - !IMPORTANT Add second material and using variant2
     vec4 texture = texture2D(uTexture, vUv);
     
-    gl_FragColor = texture;
-
+    gl_FragColor = texture + smoothstep(0., 0.7, vY);
   }
   `;
 }
@@ -196,6 +193,7 @@ Curves.prototype.resize = function () {
       this.renderer.setSize(this.size.width, this.size.height);
       this.camera.aspect = this.size.width / this.size.height;
       this.camera.updateProjectionMatrix();
+      this.effectComposer.render();
     }
   });
 };
@@ -206,21 +204,46 @@ Curves.prototype.createControls = function () {
 
 Curves.prototype.animate = function () {
   gsap.ticker.add((time) => {
-    this.material.uniforms.uTime.value = time;
-    this.material2.uniforms.uTime.value = time;
+    for (let i = 0; i < this.meshes.length; i++) {
+      this.meshes[i].material.uniforms.uTime.value = time;
+    }
 
-    this.renderer.render(this.scene, this.camera);
+    // this.renderer.render(this.scene, this.camera);
+    this.effectComposer.render();
     this.controls.update();
   });
 };
 
+Curves.prototype.createGUI = function() {
+  const gui = new GUI();
+	const bloomFolder = gui.addFolder( 'Bloom' );
+  const toneMappingFolder = gui.addFolder( 'Tone Mapping' );
+
+  bloomFolder
+  .add( this.unrealBloomPass, 'threshold', 0.0, 10 )
+  .onChange( ( value ) => this.unrealBloomPass.threshold = Number( value ));
+
+  bloomFolder
+  .add( this.unrealBloomPass, 'strength', 0.0, 10 )
+  .onChange( ( value ) => this.unrealBloomPass.strength = Number( value ));
+
+  bloomFolder
+  .add( this.unrealBloomPass, 'radius', 0.0, 10 )
+  .onChange( ( value ) => this.unrealBloomPass.radius = Number( value ));
+
+  toneMappingFolder
+  .add( this.renderer, 'toneMappingExposure', 0.0, 10 )
+  .onChange( ( value ) => this.renderer.radius = Number( value ));
+}
+
 Curves.prototype.init = function () {
   this.createScene();
   this.createCamera();
-  this.createModel();
-  this.createModel2();
+  this.createLines();
   this.createRenderer();
+  this.createFilter();
   this.createControls();
+  this.createGUI();
   this.resize();
   this.animate();
 };
