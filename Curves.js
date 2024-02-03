@@ -28,7 +28,7 @@ function Curves() {
       speed: 1.1,
       amplitude: 0.2,
       frequency: 3.,
-      points: [
+      curve: [
         new THREE.Vector3(-10.689140896731658, 2.041518463927172, 12.38487444491875),
         new THREE.Vector3(-8.204101587228354, 2.0511835509003893, 12.38487444491875),
         new THREE.Vector3(-2.164652739907572, 2.372272723877032, 12.3004846232816),
@@ -37,13 +37,15 @@ function Curves() {
         new THREE.Vector3(6.847043476617296, 1.5456594607522591, 11.668719552457011),
         new THREE.Vector3(7.9560219300636135, 1.7180363931560647, 11.380237294320157)
       ],
+      colorOne: new THREE.Vector3(0.149,0.514,0.31),
+      colorTwo: new THREE.Vector3(0.18,0.902,1.),
     },
     {
       texture: "./img/grad-yellow.jpg",
       speed: 1.1,
       amplitude: 0.1,
       frequency: 2.,
-      points: [
+      curve: [
         new THREE.Vector3(-10.689140896731658, 2.041518463927172, 12.38487444491875),
         new THREE.Vector3(-8.204101587228354, 2.0511835509003893, 12.38487444491875),
         new THREE.Vector3(-2.164652739907572, 2.372272723877032, 12.3004846232816),
@@ -52,21 +54,51 @@ function Curves() {
         new THREE.Vector3(6.847043476617296, 1.5456594607522591, 11.668719552457011),
         new THREE.Vector3(7.9560219300636135, 1.7180363931560647, 11.380237294320157)
       ],
+      colorOne: new THREE.Vector3(1.,0.506,0.012),
+      colorTwo: new THREE.Vector3(1.,0.867,0.059),
     },
     {
       texture: "./img/grad-blue.jpg",
       speed: 1.2,
       amplitude: 0.2,
       frequency: 3.,
-      points: [
+      curve: [
         new THREE.Vector3(-9.255569666329968, 3.00854450183378, 12.38487444491875),
         new THREE.Vector3(-4.795719544597945, -0.44112693645510337, 12.38487444491875),
         new THREE.Vector3(-2.045779782586448, 0.4727472514642228, 12.3004846232816),
         new THREE.Vector3(2.175621353994407, 0.18972439065774882, 12.3004846232816),
         new THREE.Vector3(4.598866185991017, -0.758162041129951, 12.178475668688959)
       ],
+      colorOne: new THREE.Vector3(0.216,0.247,0.675),
+      colorTwo: new THREE.Vector3(0.816,0.051,0.557),
     },
   ];
+
+  this.mouse = {
+    x: 1,
+    y: 1,
+    prevX: 1,
+    prevY: 1,
+    velocityX: 1,
+    velocityY: 1
+  }
+
+  this.circleMesh = null;
+}
+
+Curves.prototype.mouseMove = function() {
+  this.canvas.addEventListener("mousemove", (e) => {
+    const {left, top, width, height } = this.canvas.getBoundingClientRect();
+    this.mouse.x = ((e.clientX - left) / width);
+    this.mouse.y = ((e.clientY - top) / height);
+    
+    this.mouse.velocityX = this.mouse.x - this.mouse.prevX;
+    this.mouse.velocityY = this.mouse.y - this.mouse.prevY;
+    
+    this.mouse.prevX = this.mouse.x;
+    this.mouse.prevY = this.mouse.y;
+
+  });
 }
 
 Curves.prototype.createFilter = function() {
@@ -74,15 +106,15 @@ Curves.prototype.createFilter = function() {
   this.effectComposer = new EffectComposer(this.renderer);
   this.unrealBloomPass = new UnrealBloomPass();
   this.unrealBloomPass.resolution = new THREE.Vector2(this.size.width, this.size.height);
-  this.unrealBloomPass.strength = 1.8;
-  this.unrealBloomPass.radius = 1.2;
-  this.unrealBloomPass.threshold = 0.3;
+  this.unrealBloomPass.threshold = 0.1;
+  this.unrealBloomPass.strength = 3.4;
+  this.unrealBloomPass.radius = 1.25;
 
   this.effectComposer.addPass(this.renderPass);
   this.effectComposer.addPass(this.unrealBloomPass);
 
   this.renderer.toneMapping = THREE.CineonToneMapping;
-  this.renderer.toneMappingExposure = 1;
+  this.renderer.toneMappingExposure = 1.11;
 }
 
 Curves.prototype.createScene = function () {
@@ -98,10 +130,11 @@ Curves.prototype.createCamera = function () {
   this.camera.position.z = 17;
 };
 
-Curves.prototype.createLines = function () {
+Curves.prototype.createLines = function () { 
   for (let i = 0; i < this.variants.length; i++) {
-    const curve = new THREE.CatmullRomCurve3( this.variants[i].points);
-    const geometry = new THREE.TubeGeometry(curve, 100, 0.05, 2, false);
+    const curve = new THREE.CatmullRomCurve3(this.variants[i].curve);
+    const points = curve.getPoints( 150 );
+    const geometry = new THREE.BufferGeometry().setFromPoints( points );
     const material = new THREE.ShaderMaterial({ 
       uniforms:{
         uTime: {value: 0},
@@ -109,25 +142,34 @@ Curves.prototype.createLines = function () {
         uSpeed: {value: this.variants[i].speed},
         uAmplitude: {value: this.variants[i].amplitude},
         uFrequency: {value: this.variants[i].frequency},
+        uMouse: {value: 1},
+        uColorOne: {value: this.variants[i].colorOne},
+        uColorTwo: {value: this.variants[i].colorTwo},
       },
-      // blending: THREE.AdditiveBlending,
       vertexShader: this.vertex(),
       fragmentShader: this.fragment(),
+  
+      blending: THREE.CustomBlending,
+      blendEquation: THREE.AddEquation,
+      blendSrc: THREE.OneFactor,
+      blendDst:THREE.OneFactor ,
+      depthTest: false
+  
       // wireframe: true,
-     });
-    const mesh = new THREE.Mesh(geometry, material);
+    });
+    
+    const line = new THREE.Line( geometry, material );
      if(!i) {
-      mesh.position.y = -1.5;
-      mesh.position.x = -0.5;
+      line.position.y = -1.5;
+      line.position.x = -0.5;
     } else if(i === 1) {
-      mesh.position.y = -1.7;
+      line.position.y = -1.7;
     } else {
-       mesh.position.y = 0.5;
-       mesh.position.x = -2.5;
+       line.position.y = 0.5;
+       line.position.x = -2.5;
      }
-
-    this.meshes.push(mesh);
-    this.scene.add(mesh);
+    this.meshes.push(line);
+    this.scene.add(line)
   }
 };
 
@@ -158,14 +200,16 @@ Curves.prototype.vertex = function() {
 Curves.prototype.fragment = function() {
   return `
   uniform sampler2D uTexture;
+  uniform vec3 uColorOne;
+  uniform vec3 uColorTwo;
 
   varying float vY;
   varying vec2 vUv;
   
   void main() {
-    vec4 texture = texture2D(uTexture, vUv);
+    vec3 colorMix = mix(uColorOne, uColorTwo, smoothstep(0., 0.3, vY));
     
-    gl_FragColor = texture + smoothstep(0., 0.7, vY);
+    gl_FragColor = vec4(colorMix, 1.);
   }
   `;
 }
@@ -194,6 +238,7 @@ Curves.prototype.resize = function () {
       this.camera.aspect = this.size.width / this.size.height;
       this.camera.updateProjectionMatrix();
       this.effectComposer.render();
+      // this.renderer.render(this.scene, this.camera);
     }
   });
 };
@@ -208,8 +253,8 @@ Curves.prototype.animate = function () {
       this.meshes[i].material.uniforms.uTime.value = time;
     }
 
-    // this.renderer.render(this.scene, this.camera);
     this.effectComposer.render();
+    // this.renderer.render(this.scene, this.camera);
     this.controls.update();
   });
 };
@@ -220,19 +265,19 @@ Curves.prototype.createGUI = function() {
   const toneMappingFolder = gui.addFolder( 'Tone Mapping' );
 
   bloomFolder
-  .add( this.unrealBloomPass, 'threshold', 0.0, 10 )
+  .add( this.unrealBloomPass, 'threshold', 0.0, 5 )
   .onChange( ( value ) => this.unrealBloomPass.threshold = Number( value ));
 
   bloomFolder
-  .add( this.unrealBloomPass, 'strength', 0.0, 10 )
+  .add( this.unrealBloomPass, 'strength', 0.0, 5 )
   .onChange( ( value ) => this.unrealBloomPass.strength = Number( value ));
 
   bloomFolder
-  .add( this.unrealBloomPass, 'radius', 0.0, 10 )
+  .add( this.unrealBloomPass, 'radius', 0.0, 5 )
   .onChange( ( value ) => this.unrealBloomPass.radius = Number( value ));
 
   toneMappingFolder
-  .add( this.renderer, 'toneMappingExposure', 0.0, 10 )
+  .add( this.renderer, 'toneMappingExposure', 0.0, 5 )
   .onChange( ( value ) => this.renderer.radius = Number( value ));
 }
 
@@ -245,6 +290,7 @@ Curves.prototype.init = function () {
   this.createControls();
   this.createGUI();
   this.resize();
+  this.mouseMove();
   this.animate();
 };
 
