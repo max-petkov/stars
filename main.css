@@ -12,6 +12,6 @@ canvas {
     height: 100vh;
 }
 
-svg {
-    width: 100%;
+#stars {
+    pointer-events: none;
 }

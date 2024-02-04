@@ -5,6 +5,8 @@ import { EffectComposer } from "https://cdn.jsdelivr.net/npm/three@0.121.1/examp
 import { UnrealBloomPass } from "https://cdn.jsdelivr.net/npm/three@0.121.1/examples/jsm/postprocessing/UnrealBloomPass.js";
 import GUI from 'https://cdn.jsdelivr.net/npm/lil-gui@0.19/+esm';
 
+gsap.registerPlugin(Observer);
+
 function Curves() {
   this.canvas = document.querySelector("canvas");
   this.scene = null;
@@ -25,7 +27,20 @@ function Curves() {
   this.fov = 60;
   this.n = 4000;
   this.velocity = 0;
-  this.acceleration = 0.01;
+  this.acceleration = 0;
+  this.deltaY = 1;
+}
+
+Curves.prototype.scroll = function() {
+  Observer.create({
+    target: window, // can be any element (selector text is fine)
+    type: "wheel,touch,pointer", // comma-delimited list of what to listen for
+    scrollSpeed: 2,
+    onChangeY: (self) => {
+      this.acceleration = Math.abs(self.deltaY * 0.001);
+      this.deltaY = Math.abs(self.deltaY);
+    }
+  });
 }
 
 Curves.prototype.createFilter = function() {
@@ -51,6 +66,7 @@ Curves.prototype.createScene = function () {
 
 Curves.prototype.createCamera = function () {
   this.camera = new THREE.PerspectiveCamera(this.fov, this.size.width / this.size.height, 1, 1000);
+  // this.camera.position.y = -300;
   this.camera.position.z = Math.PI / 2;
   this.camera.position.x = Math.PI / 2;
   this.camera.position.y = Math.PI / 2;
@@ -60,12 +76,9 @@ Curves.prototype.createStars = function () {
   this.geometry = new THREE.BufferGeometry();
   this.geometry.setAttribute("position", new THREE.BufferAttribute(new Float32Array(6 * this.n), 3));
   this.geometry.setAttribute("velocity", new THREE.BufferAttribute(new Float32Array(2 * this.n), 1));
-  this.geometry.setAttribute("velocity2", new THREE.BufferAttribute(new Float32Array(this.n), 1));
 
   this.position = this.geometry.getAttribute("position");
   this.velocity = this.geometry.getAttribute("velocity");
-  this.velocity2 = this.geometry.getAttribute("velocity2");
-  console.log(this.velocity2);
 
   for (let i = 0; i < this.n; i++) {
     const x = Math.random() * 600 - 300;
@@ -83,7 +96,6 @@ Curves.prototype.createStars = function () {
     this.position.array[6 * i + 5] = z + 0.1;
 
     this.velocity.array[2 * i] = 0;
-    this.velocity.array[2 * i + 1] = 0;
   }
 
   this.material = new THREE.LineBasicMaterial({color: 0xffffff});
@@ -128,42 +140,65 @@ Curves.prototype.createControls = function () {
 Curves.prototype.animate = function () {
   gsap.ticker.add((time) => {
     for (let i = 0; i < this.n; i++) {
-      this.velocity.array[2 * i] += this.acceleration;
-
-      if(this.position.array[6 * i + 4] > 1) {
-
+      if(this.deltaY <= 1) {
         if(this.position.array[6 * i] < this.position.array[6 * i + 3]) {
-          this.position.array[6 * i] += this.velocity.array[2*i];
+          this.position.array[6 * i] += 1;
         } else {
-          const x = Math.random() * 600 - 300;
-          this.position.array[6 * i] = x;
-          this.position.array[6 * i + 3] = x + 0.01;
-          this.velocity.array[2 * i] = 0;
+          this.position.array[6 * i]  = this.position.array[6 * i + 3] + 0.1;
         }
 
         if(this.position.array[6 * i + 1] < this.position.array[6 * i + 4]) {
-          this.position.array[6 * i + 1] += this.velocity.array[2*i];
-        } else {
-          const y = Math.random() * 600 - 300;
-          this.position.array[6 * i + 1] = y;
-          this.position.array[6 * i + 4] = y + 0.01;
-          this.velocity.array[2 * i] = 0;
+          this.position.array[6 * i + 1] += 1;
+        }else {
+          this.position.array[6 * i + 1]  = this.position.array[6 * i + 4]  + 0.1;
         }
 
         if(this.position.array[6 * i + 2] < this.position.array[6 * i + 5]) {
-          this.position.array[6 * i + 2] += this.velocity.array[2*i];
-        } else {
-          const z = Math.random() * 600 - 300;
-          this.position.array[6 * i + 2] = z;
-          this.position.array[6 * i + 5] = z + 0.01;
-          this.velocity.array[2 * i] = 0;
+          this.position.array[6 * i + 2] += 1;
+        }else {
+          this.position.array[6 * i + 2]  = this.position.array[6 * i + 5] + 0.1;
         }
-        
+       
+       
       } else {
-        this.position.array[6 * i + 3] += this.velocity.array[2 * i];
-        this.position.array[6 * i + 4] += this.velocity.array[2 * i];
-        this.position.array[6 * i + 5] += this.velocity.array[2 * i];
+        this.velocity.array[2 * i] += this.acceleration;
+
+        if(this.position.array[6 * i + 4] > 1) {
+          if(this.position.array[6 * i] < this.position.array[6 * i + 3]) {
+            this.position.array[6 * i] += this.velocity.array[2*i];
+          } else {         
+            const x = Math.random() * 600 - 300;
+            this.position.array[6 * i] = x;
+            this.position.array[6 * i + 3] = x + 0.01;
+            this.velocity.array[2 * i] = 0;
+          }
+  
+          if(this.position.array[6 * i + 1] < this.position.array[6 * i + 4]) {
+            this.position.array[6 * i + 1] += this.velocity.array[2*i];
+          } else {
+            const y = Math.random() * 600 - 300;
+            this.position.array[6 * i + 1] = y;
+            this.position.array[6 * i + 4] = y + 0.01;
+            this.velocity.array[2 * i] = 0;
+          }
+  
+          if(this.position.array[6 * i + 2] < this.position.array[6 * i + 5]) {
+            this.position.array[6 * i + 2] += this.velocity.array[2*i];
+          } else {
+            const z = Math.random() * 600 - 300;
+            this.position.array[6 * i + 2] = z;
+            this.position.array[6 * i + 5] = z + 0.01;
+            this.velocity.array[2 * i] = 0;
+          }
+          
+        } else {
+          this.position.array[6 * i + 3] += this.velocity.array[2 * i];
+          this.position.array[6 * i + 4] += this.velocity.array[2 * i];
+          this.position.array[6 * i + 5] += this.velocity.array[2 * i];
+        }
       }
+
+     
     }
 
     this.position.needsUpdate = true;
@@ -196,6 +231,10 @@ Curves.prototype.createGUI = function() {
   .onChange( ( value ) => this.renderer.radius = Number( value ));
 }
 
+Curves.prototype.lerp = function(x, y, a) {
+    return x * (1 - a) + y * a;
+}
+
 Curves.prototype.init = function () {
   this.createScene();
   this.createCamera();
@@ -206,6 +245,7 @@ Curves.prototype.init = function () {
   this.createGUI();
   this.resize();
   this.animate();
+  this.scroll();
 };
 
 new Curves().init();
