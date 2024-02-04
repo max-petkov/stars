@@ -25,7 +25,7 @@ function Curves() {
     height: window.innerHeight,
   };
   this.fov = 60;
-  this.n = 4000;
+  this.n = 8000;
   this.velocity = 0;
   this.acceleration = 0;
   this.deltaY = 1;
@@ -34,11 +34,15 @@ function Curves() {
 Curves.prototype.scroll = function() {
   Observer.create({
     target: window, // can be any element (selector text is fine)
-    type: "wheel,touch,pointer", // comma-delimited list of what to listen for
-    scrollSpeed: 2,
+    type: "wheel", // comma-delimited list of what to listen for
+    wheelSpeed: 1,
     onChangeY: (self) => {
+      
       this.acceleration = Math.abs(self.deltaY * 0.001);
-      this.deltaY = Math.abs(self.deltaY);
+      if(Math.abs(self.deltaY) >= 100) this.deltaY = Math.abs(self.deltaY) / 100;
+      else this.deltaY = Math.abs(self.deltaY);
+
+      console.log(this.deltaY);
     }
   });
 }
@@ -66,7 +70,6 @@ Curves.prototype.createScene = function () {
 
 Curves.prototype.createCamera = function () {
   this.camera = new THREE.PerspectiveCamera(this.fov, this.size.width / this.size.height, 1, 1000);
-  // this.camera.position.y = -300;
   this.camera.position.z = Math.PI / 2;
   this.camera.position.x = Math.PI / 2;
   this.camera.position.y = Math.PI / 2;
