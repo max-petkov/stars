@@ -76,9 +76,11 @@ Curves.prototype.createStars = function () {
   this.geometry = new THREE.BufferGeometry();
   this.geometry.setAttribute("position", new THREE.BufferAttribute(new Float32Array(6 * this.n), 3));
   this.geometry.setAttribute("velocity", new THREE.BufferAttribute(new Float32Array(2 * this.n), 1));
+  this.geometry.setAttribute("color", new THREE.BufferAttribute(new Float32Array(6 * this.n), 3));
 
   this.position = this.geometry.getAttribute("position");
   this.velocity = this.geometry.getAttribute("velocity");
+  this.color = this.geometry.getAttribute("color");
 
   for (let i = 0; i < this.n; i++) {
     const x = Math.random() * 600 - 300;
@@ -95,10 +97,19 @@ Curves.prototype.createStars = function () {
     this.position.array[6 * i + 4] = y + 0.1;
     this.position.array[6 * i + 5] = z + 0.1;
 
+    // Velocity
     this.velocity.array[2 * i] = 0;
+
+    // Color
+    this.color.array[6 * i] = 0;
+    this.color.array[6 * i + 1] = 0;
+    this.color.array[6 * i + 2] = 0;
+    this.color.array[6 * i + 3] = 1;
+    this.color.array[6 * i + 4] = 1;
+    this.color.array[6 * i + 5] = 1;
   }
 
-  this.material = new THREE.LineBasicMaterial({color: 0xffffff});
+  this.material = new THREE.LineBasicMaterial({ vertexColors: true });
   this.lines = new THREE.LineSegments(this.geometry, this.material);
   this.scene.add(this.lines);
 };
@@ -142,23 +153,22 @@ Curves.prototype.animate = function () {
     for (let i = 0; i < this.n; i++) {
       if(this.deltaY <= 1) {
         if(this.position.array[6 * i] < this.position.array[6 * i + 3]) {
-          this.position.array[6 * i] += 1;
+          this.position.array[6 * i] += 2;
         } else {
           this.position.array[6 * i]  = this.position.array[6 * i + 3] + 0.1;
         }
 
         if(this.position.array[6 * i + 1] < this.position.array[6 * i + 4]) {
-          this.position.array[6 * i + 1] += 1;
+          this.position.array[6 * i + 1] += 2;
         }else {
           this.position.array[6 * i + 1]  = this.position.array[6 * i + 4]  + 0.1;
         }
 
         if(this.position.array[6 * i + 2] < this.position.array[6 * i + 5]) {
-          this.position.array[6 * i + 2] += 1;
+          this.position.array[6 * i + 2] += 2;
         }else {
           this.position.array[6 * i + 2]  = this.position.array[6 * i + 5] + 0.1;
         }
-       
        
       } else {
         this.velocity.array[2 * i] += this.acceleration;
